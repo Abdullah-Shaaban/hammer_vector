@@ -4,9 +4,13 @@
 
 #pragma once
 
+#define __NR_futex 202
+# define SYS_futex __NR_futex
+
 #include "hammer_enums.h"
-#include "riscv/mmu.h"
-#include "riscv/sim.h"
+#include "mmu.h"
+#include "disasm.h"
+#include "sim.h"
 
 #include <iostream>
 
@@ -16,6 +20,10 @@ class Hammer {
          std::vector<size_t> hart_ids, std::vector<mem_cfg_t> memory_layout,
          const std::string target_binary, const std::optional<uint64_t> start_pc = std::nullopt);
   ~Hammer();
+
+  std::string get_ISA(uint8_t hart_id);
+  std::string get_insn_str(uint8_t hart_id);
+  uint64_t get_insn_bits(uint8_t hart_id);
 
   reg_t get_gpr(uint8_t hart_id, uint8_t gpr_id);
   void set_gpr(uint8_t hart_id, uint8_t gpr_id, reg_t new_gpr_value);
@@ -27,7 +35,8 @@ class Hammer {
 
   reg_t get_csr(uint8_t hart_id, uint32_t csr_id);
 
-  void single_step(uint8_t hart_id);
+  void single_step(uint8_t hart_id, bool noisy);
+  // void single_step(uint8_t hart_id);
 
   uint32_t get_flen(uint8_t hart_id);
 

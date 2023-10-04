@@ -71,7 +71,10 @@ PYBIND11_MODULE(hammer, m) {
              }
              return -EINVAL;
            })
-      .def("single_step", &Hammer::single_step);
+      .def("single_step", &Hammer::single_step)
+      .def("get_ISA", &Hammer::get_ISA)
+      .def("get_insn_str", &Hammer::get_insn_str)
+      .def("get_insn_bits", &Hammer::get_insn_bits);
 
   // Reference:
   // https://stackoverflow.com/questions/47893832/pybind11-global-level-enum

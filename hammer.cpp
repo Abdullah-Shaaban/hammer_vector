@@ -4,16 +4,25 @@
 
 #include "hammer.h"
 
-#include "fesvr/option_parser.h"
-#include "riscv/cachesim.h"
-#include "riscv/decode.h"
+#include "option_parser.h"
+#include "cachesim.h"
+#include "decode.h"
 
 #include <vector>
 
 // FIXME: This function exists in Spike as a static function. We shouldn't have to
 // copy it out here but sim_t requires it as an argument.
-static std::vector<std::pair<reg_t, mem_t *>> make_mems(const std::vector<mem_cfg_t> &layout) {
-  std::vector<std::pair<reg_t, mem_t *>> mems;
+// static std::vector<std::pair<reg_t, mem_t *>> make_mems(const std::vector<mem_cfg_t> &layout) {
+//   std::vector<std::pair<reg_t, mem_t *>> mems;
+//   mems.reserve(layout.size());
+//   for (const auto &cfg : layout) {
+//     mems.push_back(std::make_pair(cfg.get_base(), new mem_t(cfg.get_size())));
+//   }
+//   return mems;
+// }
+static std::vector<std::pair<reg_t, abstract_mem_t*>> make_mems(const std::vector<mem_cfg_t> &layout)
+{
+  std::vector<std::pair<reg_t, abstract_mem_t*>> mems;
   mems.reserve(layout.size());
   for (const auto &cfg : layout) {
     mems.push_back(std::make_pair(cfg.get_base(), new mem_t(cfg.get_size())));
@@ -25,7 +34,8 @@ Hammer::Hammer(const char *isa, const char *privilege_levels, const char *vector
                std::vector<size_t> hart_ids, std::vector<mem_cfg_t> memory_layout,
                const std::string target_binary, const std::optional<uint64_t> start_pc) {
   // Expose these only if needed
-  std::vector<std::pair<reg_t, abstract_device_t *>> plugin_devices;
+  // std::vector<std::pair<reg_t, abstract_device_t *>> plugin_devices;
+  std::vector<const device_factory_t*> plugin_device_factories;
   debug_module_config_t dm_config = {.progbufsize = 2,
                                      .max_sba_data_width = 0,
                                      .require_authentication = false,
@@ -56,7 +66,8 @@ Hammer::Hammer(const char *isa, const char *privilege_levels, const char *vector
     cfg.start_pc = start_pc.value();
   }
 
-  std::vector<std::pair<reg_t, mem_t *>> mems = make_mems(memory_layout);
+  // std::vector<std::pair<reg_t, mem_t *>> mems = make_mems(memory_layout);
+  std::vector<std::pair<reg_t, abstract_mem_t *>> mems = make_mems(memory_layout);
 
   std::vector<std::string> htif_args;
   htif_args.push_back(target_binary);
@@ -65,7 +76,7 @@ Hammer::Hammer(const char *isa, const char *privilege_levels, const char *vector
   bool dtb_enabled = true;
   bool socket_enabled = false;
 
-  simulator = new sim_t(&cfg, halted, mems, plugin_devices, htif_args, dm_config, log_path,
+  simulator = new sim_t(&cfg, halted, mems, plugin_device_factories, htif_args, dm_config, log_path,
                         dtb_enabled, dtb_file, socket_enabled, cmd_file);
 
   // Initializes everything
@@ -121,8 +132,10 @@ reg_t Hammer::get_csr(uint8_t hart_id, uint32_t csr_id) {
   return hart->get_csr(csr_id);
 }
 
-void Hammer::single_step(uint8_t hart_id) {
+void Hammer::single_step(uint8_t hart_id, bool noisy) {
+// void Hammer::single_step(uint8_t hart_id) {
   processor_t *hart = simulator->get_core(hart_id);
+  simulator->set_procs_debug(noisy);
   hart->step(1);
 }
 
@@ -156,3 +169,27 @@ std::vector<uint64_t> Hammer::get_vector_reg(uint8_t hart_id, uint8_t vector_reg
   return vector_reg_value;
 }
 
+std::string Hammer::get_ISA(uint8_t hart_id) {
+  processor_t *hart = simulator->get_core(hart_id);
+  return hart->get_isa().get_isa_string();
+}
+
+// Get current instruction
+std::string Hammer::get_insn_str(uint8_t hart_id) {
+  processor_t *hart = simulator->get_core(hart_id);
+  mmu_t *mmu = hart->get_mmu();
+  reg_t pc = hart->get_state()->pc;
+  insn_fetch_t fetch = mmu->load_insn(pc);
+  insn_t insn = fetch.insn;
+  const disassembler_t *disasm = hart->get_disassembler();
+  std::string insn_str = disasm->disassemble(insn);
+  return insn_str;
+}
+uint64_t Hammer::get_insn_bits(uint8_t hart_id) {
+  processor_t *hart = simulator->get_core(hart_id);
+  mmu_t *mmu = hart->get_mmu();
+  reg_t pc = hart->get_state()->pc;
+  insn_fetch_t fetch = mmu->load_insn(pc);
+  insn_t insn = fetch.insn;
+  return insn.bits();
+}

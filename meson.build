@@ -10,7 +10,7 @@ project('hammer lib', 'cpp',
           'default_library=static'
           ]
         )
-
+#add_global_arguments('-g', language : 'cpp')
 spike_install_dir = get_option('spike_install_dir')
 
 if spike_install_dir == ''
@@ -49,12 +49,13 @@ riscv_libdep = cpp.find_library('riscv', dirs: spike_lib_directory, required: tr
 spike_incdirs = include_directories([
                                       spike_include_directory + 'softfloat',
                                       spike_include_directory + 'fesvr',
+                                      spike_include_directory + 'riscv',
                                       spike_include_directory,
                                       '.'
                                     ])
 
-hammer_lib = library('hammer',
-                      'hammer.cpp',
+hammer_lib = library('hammer',      # The *unique* name of the build target
+                      'hammer.cpp', # Input source to compile
                       include_directories : spike_incdirs,
                       dependencies : [riscv_libdep],
                       install : true
@@ -86,5 +87,6 @@ hammer_pylib = python3_instance.extension_module('hammer',
 
 install_headers('hammer.h', 'hammer_enums.h')
 
-subdir('tests')
-subdir('pytests')
+#subdir('tests')
+#subdir('pytests')
+subdir('mytests')
